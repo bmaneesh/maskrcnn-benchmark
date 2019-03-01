@@ -171,13 +171,14 @@ class COCODemo(object):
         """
         predictions = self.compute_prediction(image)
         top_predictions = self.select_top_predictions(predictions)
-
+        print(top_predictions)
         result = image.copy()
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
         result = self.overlay_boxes(result, top_predictions)
         if self.cfg.MODEL.MASK_ON:
-            result = self.overlay_mask(result, top_predictions)
+            result, contours, labels = self.overlay_mask(result, top_predictions)
+            return result, contours, labels
         if self.cfg.MODEL.KEYPOINT_ON:
             result = self.overlay_keypoints(result, top_predictions)
         result = self.overlay_class_names(result, top_predictions)
@@ -287,17 +288,19 @@ class COCODemo(object):
         labels = predictions.get_field("labels")
 
         colors = self.compute_colors_for_labels(labels).tolist()
+        contours_list = []
 
         for mask, color in zip(masks, colors):
             thresh = mask[0, :, :, None]
             contours, hierarchy = cv2_util.findContours(
                 thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
-            image = cv2.drawContours(image, contours, -1, color, 3)
-
+            # image = cv2.drawContours(image, contours, -1, color, 3)
+            image = cv2.fillPoly(image, contours, color)
+            contours_list.append(contours)
         composite = image
 
-        return composite
+        return composite, contours_list, labels.numpy()
 
     def overlay_keypoints(self, image, predictions):
         keypoints = predictions.get_field("keypoints")
